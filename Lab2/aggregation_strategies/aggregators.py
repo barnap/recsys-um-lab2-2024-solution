@@ -27,8 +27,8 @@ class AggregationStrategy(ABC):
 class AdditiveAggregator(AggregationStrategy):
     def generate_group_recommendations_for_group(self, group_ratings, recommendations_number):
         aggregated_df = group_ratings.groupby('item').sum()
-        aggregated_df = aggregated_df.sort_values(by="predicted_rating", ascending=False).reset_index()[
-            ['item', 'predicted_rating']]
+        aggregated_df = aggregated_df.sort_values(by="rating", ascending=False).reset_index()[
+            ['item', 'rating']]
         recommendation_list = list(aggregated_df.head(recommendations_number)['item'])
         return {"ADD": recommendation_list}
 
@@ -37,8 +37,8 @@ class LeastMiseryAggregator(AggregationStrategy):
     def generate_group_recommendations_for_group(self, group_ratings, recommendations_number):
         # aggregate using least misery strategy
         aggregated_df = group_ratings.groupby('item').min()
-        aggregated_df = aggregated_df.sort_values(by="predicted_rating", ascending=False).reset_index()[
-            ['item', 'predicted_rating']]
+        aggregated_df = aggregated_df.sort_values(by="rating", ascending=False).reset_index()[
+            ['item', 'rating']]
         recommendation_list = list(aggregated_df.head(recommendations_number)['item'])
         return {"LMS": recommendation_list}
 
@@ -46,8 +46,8 @@ class LeastMiseryAggregator(AggregationStrategy):
 class BaselinesAggregator(AggregationStrategy):
     def generate_group_recommendations_for_group(self, group_ratings, recommendations_number):
         # aggregate using least misery strategy
-        aggregated_df = group_ratings.groupby('item').agg({"predicted_rating": ["sum", "prod", "min", "max"]})
-        aggregated_df = aggregated_df["predicted_rating"].reset_index()
+        aggregated_df = group_ratings.groupby('item').agg({"rating": ["sum", "prod", "min", "max"]})
+        aggregated_df = aggregated_df["rating"].reset_index()
         # additive
 
         add_df = aggregated_df.sort_values(by="sum", ascending=False).reset_index()[['item', 'sum']]
@@ -77,14 +77,14 @@ class GFARAggregator(AggregationStrategy):
         if top != 'max' and top != 'min':
             raise ValueError('top must be either Max or Min')
         if top == 'max':
-            score_df.loc[score_df.index, "predicted_rating_rev"] = -score_df["predicted_rating"]
+            score_df.loc[score_df.index, "rating_rev"] = -score_df["rating"]
 
         select_top_n = min(top_n, len(score_df)-1)
-        top_n_ind = np.argpartition(score_df.predicted_rating_rev, select_top_n)[:select_top_n]
+        top_n_ind = np.argpartition(score_df.rating_rev, select_top_n)[:select_top_n]
         top_n_df = score_df.iloc[top_n_ind]
 
         if sort:
-            return top_n_df.sort_values("predicted_rating_rev")
+            return top_n_df.sort_values("rating_rev")
 
         return top_n_df
 
@@ -93,7 +93,7 @@ class GFARAggregator(AggregationStrategy):
         from scipy.stats import rankdata
         top_records = self.select_top_n_idx(candidate_group_items_df, max_rel_items, top='max', sort=False)
 
-        rel_borda = rankdata(top_records["predicted_rating_rev"].values, method='max')
+        rel_borda = rankdata(top_records["rating_rev"].values, method='max')
         # candidate_group_items_df.loc[top_records.index,"borda_score"] = rel_borda
         return (top_records.index, rel_borda)
 
@@ -104,7 +104,7 @@ class GFARAggregator(AggregationStrategy):
         group_size = len(group_members)
 
         localDF = group_ratings.copy()
-        localDF["predicted_rating_rev"] = 0.0
+        localDF["rating_rev"] = 0.0
         localDF["borda_score"] = 0.0
         localDF["p_relevant"] = 0.0
         localDF["prob_selected_not_relevant"] = 1.0
@@ -174,7 +174,7 @@ class EPFuzzDAAggregator(AggregationStrategy):
 
         localDF = group_ratings.copy()
 
-        candidate_utility = pd.pivot_table(localDF, values="predicted_rating", index="item", columns="user",
+        candidate_utility = pd.pivot_table(localDF, values="rating", index="item", columns="user",
                                            fill_value=0.0)
         candidate_sum_utility = pd.DataFrame(candidate_utility.sum(axis="columns"))
 
